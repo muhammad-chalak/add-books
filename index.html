@@ -1,211 +1,178 @@
+<!-- FILE: index.html -->
 <!DOCTYPE html>
-<html lang="ckb" dir="rtl">
+<html lang="ku" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>کتێبخانەی کوردستان</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>کتێبخانەی کوردستان 📚</title>
     
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100;300;400;500;700;900&display=swap" rel="stylesheet">
-    
-    <!-- Styles -->
-    <link rel="stylesheet" href="assets/css/style.css">
-
-    <!-- PDF.js for Auto Cover -->
+    <!-- PDF.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+
+    <!-- Font & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="assets/css/style.css" rel="stylesheet">
 </head>
 <body>
 
     <!-- Navigation -->
     <nav class="navbar">
-        <div class="container nav-content">
-            <div class="logo">
-                <span class="icon-book">📚</span>
-                <h1>کتێبخانەی کوردستان</h1>
+        <div class="nav-content">
+            <div class="logo" onclick="app.navigate('home')">
+                <h1>کتێبخانەی کوردستان 🏔️</h1>
             </div>
-            <div class="nav-controls">
-                <div class="search-bar">
-                    <input type="text" id="searchInput" placeholder="گەڕان بۆ کتێب، نووسەر...">
-                    <button id="searchBtn">🔍</button>
-                </div>
-                <button id="themeToggle" class="icon-btn" title="گۆڕینی ڕەنگ">🌙</button>
-                <button id="adminBtn" class="btn-primary">Admin</button>
+            <div class="nav-actions">
+                <button id="adminBtn" class="btn-icon" onclick="app.toggleAdminPanel()">⚙️ ئەدمین</button>
             </div>
         </div>
     </nav>
 
-    <!-- Main Content (Public View) -->
-    <main id="publicView" class="container">
+    <!-- Main Container -->
+    <main id="mainContainer">
         
-        <!-- Hero Section -->
-        <header class="hero">
-            <div class="hero-text">
-                <h2>سەرچاوەی زانیاری و مەعریفە</h2>
-                <p>گەورەترین کتێبخانەی دیجیتاڵی کوردی؛ ئیسلامی، مێژوو، و زیاتر.</p>
+        <!-- VIEW: Home -->
+        <section id="view-home" class="view active">
+            <!-- Search & Filter -->
+            <div class="search-section">
+                <input type="text" id="searchInput" placeholder="گەڕان بۆ کتێب، نووسەر..." onkeyup="app.handleSearch()">
+                <div class="filters-scroll">
+                    <button class="chip active" onclick="app.filterCategory('all', this)">هەمووی</button>
+                    <button class="chip" onclick="app.filterCategory('ئیسـلامی', this)">ئیسـلامی</button>
+                    <button class="chip" onclick="app.filterCategory('دەرووناسی', this)">دەرووناسی</button>
+                    <button class="chip" onclick="app.filterCategory('مێژوو', this)">مێژوو</button>
+                    <button class="chip" onclick="app.filterCategory('سیاسەت', this)">سیاسەت</button>
+                </div>
+                <!-- Islamic Sub-filters (Hidden by default) -->
+                <div id="islamicFilters" class="sub-filters hidden">
+                    <button class="chip-sm" onclick="app.filterSub('all')">هەموو بەشەکان</button>
+                    <button class="chip-sm" onclick="app.filterSub('تەفسیر')">تەفسیر</button>
+                    <button class="chip-sm" onclick="app.filterSub('فقە')">فقە</button>
+                    <button class="chip-sm" onclick="app.filterSub('عەقیدە')">عەقیدە</button>
+                    <button class="chip-sm" onclick="app.filterSub('فەرموودە')">فەرموودە</button>
+                    <button class="chip-sm" onclick="app.filterSub('تاریخ')">تاریخ</button>
+                </div>
             </div>
-        </header>
 
-        <!-- Filters -->
-        <section class="filters-section">
-            <div class="filter-scroll">
-                <button class="filter-chip active" data-cat="all">هەمووی</button>
-                <button class="filter-chip" data-cat="Islamic">ئیسلامی</button>
-                <button class="filter-chip" data-cat="History">مێژوو</button>
-                <button class="filter-chip" data-cat="Psychology">دەروونناسی</button>
-                <button class="filter-chip" data-cat="Literature">ئەدەب</button>
-                <button class="filter-chip" data-cat="Favorites">دڵخوازەکان ❤️</button>
+            <!-- Books Grid -->
+            <div id="booksGrid" class="books-grid">
+                <!-- Books injected by JS -->
             </div>
-            <!-- Sub Categories (Hidden by default) -->
-            <div id="subCategories" class="sub-filters hidden">
-                <button class="sub-chip" data-sub="all">هەموو بەشەکان</button>
-                <button class="sub-chip" data-sub="تەفسیر">تەفسیر</button>
-                <button class="sub-chip" data-sub="فقه">فقه</button>
-                <button class="sub-chip" data-sub="عەقیدە">عەقیدە</button>
-                <button class="sub-chip" data-sub="فەرموودە">فەرموودە</button>
+            
+            <div id="emptyState" class="empty-state hidden">
+                <p>هیچ کتێبێک نەدۆزرایەوە.</p>
             </div>
         </section>
 
-        <!-- Book Grid -->
-        <section id="booksGrid" class="books-grid">
-            <!-- Books will be injected here via JS -->
-            <div class="loading">تکایە چاوەڕێبە، کتێبەکان دەخوێندرێنەوە...</div>
+        <!-- VIEW: Book Details -->
+        <section id="view-details" class="view hidden">
+            <button class="btn-back" onclick="app.navigate('home')">← گەڕانەوە</button>
+            <div id="bookDetailContent" class="detail-container">
+                <!-- Details injected by JS -->
+            </div>
         </section>
 
-    </main>
-
-    <!-- Admin Panel (Hidden by default) -->
-    <main id="adminView" class="container hidden">
-        <header class="admin-header">
-            <h2>داشبۆردی بەڕێوەبردن</h2>
-            <div class="admin-actions">
-                <button id="downloadJsonBtn" class="btn-success">⬇ دابەزاندنی JSON</button>
-                <button id="exitAdminBtn" class="btn-danger">دەرچوون</button>
+        <!-- VIEW: Admin Login -->
+        <div id="adminModal" class="modal hidden">
+            <div class="modal-content">
+                <h2>چوونەژووری ئەدمین</h2>
+                <input type="password" id="adminPin" placeholder="کۆدی نهێنی (1234)" maxlength="4">
+                <div class="modal-actions">
+                    <button class="btn-secondary" onclick="app.closeModals()">داخستن</button>
+                    <button class="btn-primary" onclick="app.checkAdmin()">چوونەژوور</button>
+                </div>
             </div>
-        </header>
-
-        <div class="admin-tabs">
-            <button class="tab-btn active" data-tab="list">لیستی کتێبەکان</button>
-            <button class="tab-btn" data-tab="add">زیادکردنی کتێب</button>
         </div>
 
-        <!-- Tab: List -->
-        <section id="tabList" class="admin-section">
-            <div class="table-responsive">
-                <table class="admin-table">
-                    <thead>
-                        <tr>
-                            <th>وێنە</th>
-                            <th>ناونیشان</th>
-                            <th>بەش</th>
-                            <th>کردارەکان</th>
-                        </tr>
-                    </thead>
-                    <tbody id="adminBookList">
-                        <!-- Rows injected via JS -->
-                    </tbody>
-                </table>
+        <!-- VIEW: Admin Dashboard -->
+        <section id="view-admin" class="view hidden">
+            <div class="admin-header">
+                <h2>داشبۆردی بەڕێوەبردن</h2>
+                <div>
+                    <button class="btn-secondary" onclick="app.exportData()">📥 Export JSON</button>
+                    <button class="btn-danger" onclick="app.logout()">چوونەدەرەوە</button>
+                </div>
             </div>
-        </section>
 
-        <!-- Tab: Add/Edit -->
-        <section id="tabAdd" class="admin-section hidden">
-            <form id="bookForm" class="admin-form">
-                <div class="form-grid">
+            <div class="admin-tabs">
+                <button class="tab-btn active" onclick="app.switchAdminTab('add')">زیادکردنی کتێب</button>
+                <button class="tab-btn" onclick="app.switchAdminTab('list')">لیستی کتێبەکان</button>
+            </div>
+
+            <!-- Tab: Add Book -->
+            <div id="admin-tab-add" class="admin-panel active">
+                <form id="addBookForm" onsubmit="event.preventDefault(); app.saveNewBook();">
                     <div class="form-group">
-                        <label>ناونیشانی کتێب *</label>
-                        <input type="text" id="inpTitle" required>
+                        <label>ناوی کتێب *</label>
+                        <input type="text" id="newTitle" required>
                     </div>
                     <div class="form-group">
                         <label>نووسەر *</label>
-                        <input type="text" id="inpAuthor" required>
+                        <input type="text" id="newAuthor" required>
                     </div>
                     <div class="form-group">
                         <label>بەشی سەرەکی *</label>
-                        <select id="inpCategory" required>
-                            <option value="Islamic">ئیسلامی</option>
-                            <option value="History">مێژوو</option>
-                            <option value="Psychology">دەروونناسی</option>
-                            <option value="Politics">سیاسەت</option>
-                            <option value="Literature">ئەدەب</option>
-                            <option value="General">هەمەجۆر</option>
+                        <select id="newCategory" onchange="app.toggleIslamicSub(this.value)" required>
+                            <option value="">هەڵبژێرە...</option>
+                            <option value="ئیسـلامی">ئیسـلامی</option>
+                            <option value="دەرووناسی">دەرووناسی</option>
+                            <option value="مێژوو">مێژوو</option>
+                            <option value="سیاسەت">سیاسەت</option>
                         </select>
                     </div>
-                    <div class="form-group hidden" id="groupSubCat">
-                        <label>بەشی ئیسلامی</label>
-                        <select id="inpSubCategory">
+                    <div class="form-group hidden" id="newIslamicSubGroup">
+                        <label>بەشی ئیسلامی *</label>
+                        <select id="newIslamicSection">
                             <option value="تەفسیر">تەفسیر</option>
-                            <option value="فقه">فقه</option>
+                            <option value="فقە">فقە</option>
                             <option value="عەقیدە">عەقیدە</option>
                             <option value="فەرموودە">فەرموودە</option>
-                            <option value="تاریخ">تاریخی ئیسلامی</option>
-                            <option value="General">هەمەجۆر</option>
+                            <option value="تاریخ">تاریخ</option>
+                            <option value="کتێبی هەمەجۆر">کتێبی هەمەجۆر</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>زمان</label>
-                        <select id="inpLanguage">
-                            <option value="کوردی">کوردی</option>
-                            <option value="عەرەبی">عەرەبی</option>
-                            <option value="فارسی">فارسی</option>
-                            <option value="ئینگلیزی">English</option>
-                        </select>
+                        <label>کورتە (Description)</label>
+                        <textarea id="newDesc" rows="3"></textarea>
                     </div>
-                </div>
-
-                <div class="form-group">
-                    <label>پوختە / Description</label>
-                    <textarea id="inpDesc" rows="3"></textarea>
-                </div>
-
-                <!-- Volume Manager -->
-                <div class="volumes-section">
-                    <h3>فایلەکان (PDF)</h3>
-                    <div id="volumeList" class="volume-list">
-                        <!-- Volume items here -->
-                    </div>
-                    <button type="button" id="addVolumeBtn" class="btn-secondary small">+ زیادکردنی بەرگ</button>
                     
-                    <div class="auto-cover-box">
-                        <p>بۆ درووستکردنی کەڤەر، فایلێک هەڵبژێرە (تەنها بۆ درووستکردنی وێنە):</p>
-                        <input type="file" id="coverGeneratorInput" accept="application/pdf">
-                        <div class="preview-area">
-                            <img id="coverPreview" src="" alt="Cover Preview">
-                            <input type="hidden" id="inpCoverBase64">
+                    <div class="form-group file-area">
+                        <label>فایلەکان (PDF) *</label>
+                        <p class="hint">دەتوانیت چەند فایلێک بەیەکەوە هەڵبژێریت (بەرگەکان)</p>
+                        <input type="file" id="newFiles" accept="application/pdf" multiple required onchange="app.handleFileSelect(this)">
+                        <div id="filePreviewList" class="file-list"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>کەڤەر</label>
+                        <div id="coverPreview" class="cover-preview-box">
+                            <span class="placeholder">لە یەکەم پەڕەی PDF درووست دەکرێت</span>
                         </div>
                     </div>
-                </div>
 
-                <div class="form-actions">
-                    <button type="submit" class="btn-primary large">زیادکردنی کتێب</button>
-                    <button type="button" id="clearFormBtn" class="btn-danger">پاککردنەوە</button>
+                    <button type="submit" class="btn-primary full-width" id="saveBtn">زیادکردن</button>
+                </form>
+            </div>
+
+            <!-- Tab: List Books -->
+            <div id="admin-tab-list" class="admin-panel hidden">
+                <div id="adminBookList" class="admin-list">
+                    <!-- List injected by JS -->
                 </div>
-            </form>
+            </div>
         </section>
+
     </main>
 
-    <!-- Modals -->
-    <!-- Login Modal -->
-    <div id="loginModal" class="modal">
-        <div class="modal-content">
-            <h3>چوونەژوورەوەی ئەدمین</h3>
-            <input type="password" id="adminPass" placeholder="کۆدی نهێنی (1234)">
-            <div class="modal-actions">
-                <button id="loginConfirm" class="btn-primary">چوونەژوورەوە</button>
-                <button onclick="closeModal('loginModal')" class="btn-secondary">داخستن</button>
-            </div>
-        </div>
-    </div>
+    <div id="toast" class="toast hidden">پەیام</div>
 
-    <!-- Volume Select Modal (Public) -->
-    <div id="volumeModal" class="modal">
-        <div class="modal-content">
-            <h3 id="vmTitle">هەڵبژاردنی بەرگ</h3>
-            <div id="vmList" class="vm-grid"></div>
-            <button onclick="closeModal('volumeModal')" class="btn-secondary full-width">داخستن</button>
-        </div>
-    </div>
-
+    <!-- Scripts -->
+    <script src="assets/js/db.js"></script>
+    <script src="assets/js/pdf-helper.js"></script>
     <script src="assets/js/app.js"></script>
 </body>
 </html>
