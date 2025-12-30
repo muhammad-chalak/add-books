@@ -1,23 +1,18 @@
 // FILE: assets/js/app.js
-/**
- * Main Application Logic
- * UI Controller, Event Handling, Routing
- */
-
 const app = {
     state: {
         books: [],
         currentFilter: 'all',
         currentSubFilter: 'all',
         selectedFiles: [],
-        generatedCover: null
+        generatedCover: null,
+        currentBookType: 'single'
     },
 
     init: async () => {
         await db.init();
         app.loadBooks();
         app.checkSession();
-        // Handle iOS URL bar hiding fix
         window.scrollTo(0,1);
     },
 
@@ -26,7 +21,6 @@ const app = {
         app.renderBooks();
     },
 
-    // --- Navigation & Routing ---
     navigate: (viewName) => {
         document.querySelectorAll('.view').forEach(el => el.classList.remove('active', 'hidden'));
         document.querySelectorAll('.view').forEach(el => el.classList.add('hidden'));
@@ -53,7 +47,6 @@ const app = {
         document.querySelectorAll('.modal').forEach(el => el.classList.add('hidden'));
     },
 
-    // --- Auth ---
     checkAdmin: () => {
         const pin = document.getElementById('adminPin').value;
         if (pin === '1234') {
@@ -68,7 +61,6 @@ const app = {
     },
 
     checkSession: () => {
-        // Auto logout after 30 mins
         const sess = localStorage.getItem('admin_session');
         if(sess && (Date.now() - sess > 30*60*1000)) {
             localStorage.removeItem('admin_session');
@@ -86,7 +78,6 @@ const app = {
         document.querySelectorAll('.tab-btn').forEach(e => e.classList.remove('active'));
         
         document.getElementById(`admin-tab-${tab}`).classList.remove('hidden');
-        // Find button index to set active (simple query)
         const btns = document.querySelectorAll('.tab-btn');
         if(tab === 'add') btns[0].classList.add('active');
         else btns[1].classList.add('active');
@@ -101,17 +92,14 @@ const app = {
         
         let filtered = app.state.books;
 
-        // Category Filter
         if (app.state.currentFilter !== 'all') {
             filtered = filtered.filter(b => b.category === app.state.currentFilter);
         }
         
-        // Islamic Sub-filter
         if (app.state.currentFilter === 'ئیسـلامی' && app.state.currentSubFilter !== 'all') {
             filtered = filtered.filter(b => b.islamic_section === app.state.currentSubFilter);
         }
 
-        // Search
         const search = document.getElementById('searchInput').value.toLowerCase();
         if (search) {
             filtered = filtered.filter(b => 
@@ -143,13 +131,10 @@ const app = {
 
     filterCategory: (cat, btn) => {
         app.state.currentFilter = cat;
-        app.state.currentSubFilter = 'all'; // reset sub
-        
-        // UI Active State
+        app.state.currentSubFilter = 'all'; 
         document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
         btn.classList.add('active');
 
-        // Show/Hide Sub filters
         const subNav = document.getElementById('islamicFilters');
         if (cat === 'ئیسـلامی') subNav.classList.remove('hidden');
         else subNav.classList.add('hidden');
@@ -176,7 +161,7 @@ const app = {
         const container = document.getElementById('bookDetailContent');
         
         let volumesHtml = '';
-        book.volumes.forEach((vol, idx) => {
+        book.volumes.forEach((vol) => {
             volumesHtml += `
                 <div class="volume-item">
                     <span>📚 ${vol.label}</span>
@@ -200,7 +185,6 @@ const app = {
                 ${volumesHtml}
             </div>
         `;
-        
         app.navigate('details');
     },
 
@@ -214,11 +198,9 @@ const app = {
             const url = URL.createObjectURL(fileBlob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${label}.pdf`; // Name for download
+            a.download = key; // Use the key (filename) as download name
             document.body.appendChild(a);
             a.click();
-            
-            // Open in new tab for iPhone viewing
             setTimeout(() => {
                 window.open(url, '_blank');
                 document.body.removeChild(a);
@@ -229,35 +211,53 @@ const app = {
         }
     },
 
-    // --- Admin: Add Book ---
-    handleFileSelect: async (input) => {
+    // --- Admin: Add Book (Updated Logic) ---
+    toggleBookType: (type) => {
+        app.state.selectedFiles = [];
+        document.getElementById('coverPreview').innerHTML = '<span class="placeholder">...</span>';
+        
+        if (type === 'single') {
+            document.getElementById('singleFileSection').classList.remove('hidden');
+            document.getElementById('multiFileSection').classList.add('hidden');
+            document.getElementById('singleFile').value = '';
+        } else {
+            document.getElementById('singleFileSection').classList.add('hidden');
+            document.getElementById('multiFileSection').classList.remove('hidden');
+            document.getElementById('multiFiles').value = '';
+            document.getElementById('filePreviewList').innerHTML = '';
+        }
+    },
+
+    handleFileSelect: async (input, type) => {
         const files = Array.from(input.files);
         if (files.length === 0) return;
 
         app.state.selectedFiles = files;
-        
-        // 1. Generate Cover from first file
-        document.getElementById('coverPreview').innerHTML = '<span class="placeholder">جارێ...</span>';
+        app.state.currentBookType = type;
+
+        // Cover from first file
+        document.getElementById('coverPreview').innerHTML = '<span class="placeholder">...</span>';
         const coverData = await generateCoverFromPDF(files[0]);
         app.state.generatedCover = coverData;
-        
         if (coverData) {
             document.getElementById('coverPreview').innerHTML = `<img src="${coverData}">`;
         }
 
-        // 2. List volumes with editable names
-        const listContainer = document.getElementById('filePreviewList');
-        listContainer.innerHTML = '';
-        files.forEach((f, i) => {
-            const div = document.createElement('div');
-            div.className = 'file-list-item';
-            div.innerHTML = `
-                <span>📄</span>
-                <input type="text" id="vol_name_${i}" value="بەرگی ${i + 1}">
-                <small>(${Math.round(f.size/1024/1024*10)/10} MB)</small>
-            `;
-            listContainer.appendChild(div);
-        });
+        // List for Multi
+        if (type === 'multi') {
+            const listContainer = document.getElementById('filePreviewList');
+            listContainer.innerHTML = '';
+            files.forEach((f, i) => {
+                const div = document.createElement('div');
+                div.className = 'file-list-item';
+                div.innerHTML = `
+                    <span>📄</span>
+                    <input type="text" id="vol_name_${i}" value="بەرگی ${i + 1}" placeholder="ناوی بەرگ">
+                    <small>(${f.name})</small>
+                `;
+                listContainer.appendChild(div);
+            });
+        }
     },
 
     toggleIslamicSub: (val) => {
@@ -278,7 +278,7 @@ const app = {
             const sub = cat === 'ئیسـلامی' ? document.getElementById('newIslamicSection').value : '';
             const desc = document.getElementById('newDesc').value;
             
-            if (!app.state.selectedFiles.length) {
+            if (!app.state.selectedFiles || app.state.selectedFiles.length === 0) {
                 alert('تکایە فایل هەڵبژێرە');
                 throw new Error('No files');
             }
@@ -287,13 +287,28 @@ const app = {
             const volumes = [];
             const fileObjects = [];
 
-            // Process each file
-            for (let i = 0; i < app.state.selectedFiles.length; i++) {
-                const file = app.state.selectedFiles[i];
-                const label = document.getElementById(`vol_name_${i}`).value || `File ${i+1}`;
-                const fileKey = `${bookId}_v${i+1}`;
-                
-                volumes.push({ label, fileKey });
+            const isMulti = document.querySelector('input[name="bookType"]:checked').value === 'multi';
+
+            if (isMulti) {
+                // Multi Files
+                for (let i = 0; i < app.state.selectedFiles.length; i++) {
+                    const file = app.state.selectedFiles[i];
+                    const labelInput = document.getElementById(`vol_name_${i}`);
+                    const label = labelInput ? labelInput.value : file.name;
+                    
+                    // Key = Actual Filename
+                    const fileKey = file.name;
+                    
+                    volumes.push({ label: label, fileKey: fileKey });
+                    fileObjects.push({ key: fileKey, blob: file });
+                }
+            } else {
+                // Single File
+                const file = app.state.selectedFiles[0];
+                const label = "تەواوی کتێبەکە"; 
+                const fileKey = file.name;
+
+                volumes.push({ label: label, fileKey: fileKey });
                 fileObjects.push({ key: fileKey, blob: file });
             }
 
@@ -308,16 +323,18 @@ const app = {
             await db.addBook(newBook, fileObjects);
             
             app.toast('کتێب بە سەرکەوتوویی زیادکرا');
+            
             document.getElementById('addBookForm').reset();
             document.getElementById('filePreviewList').innerHTML = '';
             document.getElementById('coverPreview').innerHTML = '';
             app.state.selectedFiles = [];
-            app.loadBooks(); // refresh memory
+            app.toggleBookType('single'); // Reset to default
+            app.loadBooks(); 
             
-} catch (e) {
-    console.error(e);
-    alert('هەڵە: ' + e.message); // ئەمە هۆکارەکە دەنووسێت
-} finally {
+        } catch (e) {
+            console.error(e);
+            alert('کێشەیەک ڕوویدا: ' + e.message);
+        } finally {
             btn.innerText = 'زیادکردن';
             btn.disabled = false;
         }
@@ -370,5 +387,4 @@ const app = {
     }
 };
 
-// Start
 document.addEventListener('DOMContentLoaded', app.init);
