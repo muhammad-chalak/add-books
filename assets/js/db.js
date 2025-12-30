@@ -4,8 +4,8 @@
  * Handles storing PDF blobs and Book Metadata
  */
 
-const DB_NAME = 'KurdistanLibDB';
-const DB_VERSION = 2;
+const DB_NAME = 'KurdistanLib_New_V1'; 
+const DB_VERSION = 1;
 const STORE_FILES = 'files'; // Stores PDF blobs
 
 class StorageManager {
