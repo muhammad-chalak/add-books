@@ -47,7 +47,7 @@
                     <button class="chip" onclick="app.filterCategory('مێژوو', this)">مێژوو</button>
                     <button class="chip" onclick="app.filterCategory('سیاسەت', this)">سیاسەت</button>
                 </div>
-                <!-- Islamic Sub-filters (Hidden by default) -->
+                <!-- Islamic Sub-filters -->
                 <div id="islamicFilters" class="sub-filters hidden">
                     <button class="chip-sm" onclick="app.filterSub('all')">هەموو بەشەکان</button>
                     <button class="chip-sm" onclick="app.filterSub('تەفسیر')">تەفسیر</button>
@@ -59,9 +59,7 @@
             </div>
 
             <!-- Books Grid -->
-            <div id="booksGrid" class="books-grid">
-                <!-- Books injected by JS -->
-            </div>
+            <div id="booksGrid" class="books-grid"></div>
             
             <div id="emptyState" class="empty-state hidden">
                 <p>هیچ کتێبێک نەدۆزرایەوە.</p>
@@ -71,9 +69,7 @@
         <!-- VIEW: Book Details -->
         <section id="view-details" class="view hidden">
             <button class="btn-back" onclick="app.navigate('home')">← گەڕانەوە</button>
-            <div id="bookDetailContent" class="detail-container">
-                <!-- Details injected by JS -->
-            </div>
+            <div id="bookDetailContent" class="detail-container"></div>
         </section>
 
         <!-- VIEW: Admin Login -->
@@ -106,6 +102,22 @@
             <!-- Tab: Add Book -->
             <div id="admin-tab-add" class="admin-panel active">
                 <form id="addBookForm" onsubmit="event.preventDefault(); app.saveNewBook();">
+                    
+                    <!-- New: Single vs Multi Switch -->
+                    <div class="form-group">
+                        <label>جۆری کتێب:</label>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="bookType" value="single" checked onchange="app.toggleBookType('single')">
+                                <span>یەک بەرگ (Single)</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="bookType" value="multi" onchange="app.toggleBookType('multi')">
+                                <span>چەند بەرگێک (Multi)</span>
+                            </label>
+                        </div>
+                    </div>
+
                     <div class="form-group">
                         <label>ناوی کتێب *</label>
                         <input type="text" id="newTitle" required>
@@ -140,10 +152,17 @@
                         <textarea id="newDesc" rows="3"></textarea>
                     </div>
                     
-                    <div class="form-group file-area">
+                    <!-- Single File Input -->
+                    <div id="singleFileSection" class="form-group file-area">
+                        <label>فایل (PDF) *</label>
+                        <input type="file" id="singleFile" accept="application/pdf" onchange="app.handleFileSelect(this, 'single')">
+                    </div>
+
+                    <!-- Multi File Input (Hidden by default) -->
+                    <div id="multiFileSection" class="form-group file-area hidden">
                         <label>فایلەکان (PDF) *</label>
-                        <p class="hint">دەتوانیت چەند فایلێک بەیەکەوە هەڵبژێریت (بەرگەکان)</p>
-                        <input type="file" id="newFiles" accept="application/pdf" multiple required onchange="app.handleFileSelect(this)">
+                        <p class="hint">دەتوانیت چەند فایلێک بەیەکەوە هەڵبژێریت</p>
+                        <input type="file" id="multiFiles" accept="application/pdf" multiple onchange="app.handleFileSelect(this, 'multi')">
                         <div id="filePreviewList" class="file-list"></div>
                     </div>
 
@@ -160,9 +179,7 @@
 
             <!-- Tab: List Books -->
             <div id="admin-tab-list" class="admin-panel hidden">
-                <div id="adminBookList" class="admin-list">
-                    <!-- List injected by JS -->
-                </div>
+                <div id="adminBookList" class="admin-list"></div>
             </div>
         </section>
 
