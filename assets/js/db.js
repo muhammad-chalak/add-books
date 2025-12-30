@@ -5,7 +5,7 @@
  */
 
 const DB_NAME = 'KurdistanLibDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_FILES = 'files'; // Stores PDF blobs
 
 class StorageManager {
