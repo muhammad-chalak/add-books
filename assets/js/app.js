@@ -314,10 +314,10 @@ const app = {
             app.state.selectedFiles = [];
             app.loadBooks(); // refresh memory
             
-        } catch (e) {
-            console.error(e);
-            alert('کێشەیەک ڕوویدا!');
-        } finally {
+} catch (e) {
+    console.error(e);
+    alert('هەڵە: ' + e.message); // ئەمە هۆکارەکە دەنووسێت
+} finally {
             btn.innerText = 'زیادکردن';
             btn.disabled = false;
         }
