@@ -1,386 +1,374 @@
-/* 
-    Kurdistan Library - Core Logic
-    Architecture: State-Based (Data stored in JSON, modified in RAM, Exported to file)
-*/
+// FILE: assets/js/app.js
+/**
+ * Main Application Logic
+ * UI Controller, Event Handling, Routing
+ */
 
-// --- State ---
-const state = {
-    books: [],
-    filter: { category: 'all', sub: 'all', search: '' },
-    isAdmin: false,
-    theme: localStorage.getItem('theme') || 'light'
-};
+const app = {
+    state: {
+        books: [],
+        currentFilter: 'all',
+        currentSubFilter: 'all',
+        selectedFiles: [],
+        generatedCover: null
+    },
 
-// --- DOM Elements ---
-const els = {
-    grid: document.getElementById('booksGrid'),
-    search: document.getElementById('searchInput'),
-    searchBtn: document.getElementById('searchBtn'),
-    chips: document.querySelectorAll('.filter-chip'),
-    subChips: document.querySelectorAll('.sub-chip'),
-    subSection: document.getElementById('subCategories'),
-    themeToggle: document.getElementById('themeToggle'),
-    adminBtn: document.getElementById('adminBtn'),
-    publicView: document.getElementById('publicView'),
-    adminView: document.getElementById('adminView'),
-    loginModal: document.getElementById('loginModal'),
-    volumeModal: document.getElementById('volumeModal'),
-    // Admin Forms
-    bookForm: document.getElementById('bookForm'),
-    volumeList: document.getElementById('volumeList'),
-    coverInput: document.getElementById('coverGeneratorInput'),
-    coverPreview: document.getElementById('coverPreview'),
-    coverBase64: document.getElementById('inpCoverBase64')
-};
+    init: async () => {
+        await db.init();
+        app.loadBooks();
+        app.checkSession();
+        // Handle iOS URL bar hiding fix
+        window.scrollTo(0,1);
+    },
 
-// --- Initialization ---
-document.addEventListener('DOMContentLoaded', async () => {
-    applyTheme();
-    await loadBooks();
-    setupEventListeners();
-});
+    loadBooks: () => {
+        app.state.books = db.getMetadata();
+        app.renderBooks();
+    },
 
-// --- Data Handling ---
-async function loadBooks() {
-    try {
-        const res = await fetch('data/books.json');
-        if (!res.ok) throw new Error('Failed to load');
-        const data = await res.json();
-        state.books = data.books || [];
-        renderBooks();
-    } catch (e) {
-        console.error(e);
-        // Fallback or Empty state if file missing
-        state.books = [];
-        els.grid.innerHTML = '<div class="error">هیچ کتێبێک نەدۆزرایەوە (یان JSON بوونی نییە)</div>';
-    }
-}
-
-// --- Rendering ---
-function renderBooks() {
-    els.grid.innerHTML = '';
-    
-    // Filter Logic
-    let filtered = state.books.filter(b => {
-        const matchCat = state.filter.category === 'all' || b.category === state.filter.category;
-        const matchSub = state.filter.sub === 'all' || b.subCategory === state.filter.sub;
+    // --- Navigation & Routing ---
+    navigate: (viewName) => {
+        document.querySelectorAll('.view').forEach(el => el.classList.remove('active', 'hidden'));
+        document.querySelectorAll('.view').forEach(el => el.classList.add('hidden'));
         
-        // Favorite logic
-        if (state.filter.category === 'Favorites') {
-            const favs = JSON.parse(localStorage.getItem('favs') || '[]');
-            return favs.includes(b.id);
+        const target = document.getElementById(`view-${viewName}`);
+        if(target) {
+            target.classList.remove('hidden');
+            target.classList.add('active');
+        }
+        window.scrollTo(0,0);
+    },
+
+    toggleAdminPanel: () => {
+        const isLoggedIn = localStorage.getItem('admin_session');
+        if (isLoggedIn) {
+            app.navigate('admin');
+            app.renderAdminList();
+        } else {
+            document.getElementById('adminModal').classList.remove('hidden');
+        }
+    },
+
+    closeModals: () => {
+        document.querySelectorAll('.modal').forEach(el => el.classList.add('hidden'));
+    },
+
+    // --- Auth ---
+    checkAdmin: () => {
+        const pin = document.getElementById('adminPin').value;
+        if (pin === '1234') {
+            localStorage.setItem('admin_session', Date.now());
+            app.closeModals();
+            document.getElementById('adminPin').value = '';
+            app.navigate('admin');
+            app.renderAdminList();
+        } else {
+            app.toast('کۆدەکە هەڵەیە!');
+        }
+    },
+
+    checkSession: () => {
+        // Auto logout after 30 mins
+        const sess = localStorage.getItem('admin_session');
+        if(sess && (Date.now() - sess > 30*60*1000)) {
+            localStorage.removeItem('admin_session');
+        }
+    },
+
+    logout: () => {
+        localStorage.removeItem('admin_session');
+        app.navigate('home');
+        app.toast('دەرچوویت');
+    },
+
+    switchAdminTab: (tab) => {
+        document.querySelectorAll('.admin-panel').forEach(e => e.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(e => e.classList.remove('active'));
+        
+        document.getElementById(`admin-tab-${tab}`).classList.remove('hidden');
+        // Find button index to set active (simple query)
+        const btns = document.querySelectorAll('.tab-btn');
+        if(tab === 'add') btns[0].classList.add('active');
+        else btns[1].classList.add('active');
+        
+        if(tab === 'list') app.renderAdminList();
+    },
+
+    // --- Home Logic ---
+    renderBooks: () => {
+        const grid = document.getElementById('booksGrid');
+        grid.innerHTML = '';
+        
+        let filtered = app.state.books;
+
+        // Category Filter
+        if (app.state.currentFilter !== 'all') {
+            filtered = filtered.filter(b => b.category === app.state.currentFilter);
+        }
+        
+        // Islamic Sub-filter
+        if (app.state.currentFilter === 'ئیسـلامی' && app.state.currentSubFilter !== 'all') {
+            filtered = filtered.filter(b => b.islamic_section === app.state.currentSubFilter);
         }
 
-        const term = state.filter.search.toLowerCase();
-        const matchSearch = !term || b.title.toLowerCase().includes(term) || b.author.toLowerCase().includes(term);
+        // Search
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        if (search) {
+            filtered = filtered.filter(b => 
+                b.title.toLowerCase().includes(search) || 
+                b.author.toLowerCase().includes(search)
+            );
+        }
 
-        return matchCat && matchSub && matchSearch;
-    });
+        if (filtered.length === 0) {
+            document.getElementById('emptyState').classList.remove('hidden');
+        } else {
+            document.getElementById('emptyState').classList.add('hidden');
+            filtered.forEach(book => {
+                const card = document.createElement('div');
+                card.className = 'book-card';
+                card.onclick = () => app.openBook(book.id);
+                card.innerHTML = `
+                    <img src="${book.cover && book.cover.imageData ? book.cover.imageData : 'assets/img/placeholder.png'}" class="card-cover" loading="lazy">
+                    <div class="card-info">
+                        <div class="card-title">${book.title}</div>
+                        <div class="card-author">${book.author}</div>
+                        ${book.islamic_section ? `<span class="card-badge">${book.islamic_section}</span>` : ''}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+    },
 
-    if (filtered.length === 0) {
-        els.grid.innerHTML = '<p>هیچ ئەنجامێک نەدۆزرایەوە</p>';
-        return;
-    }
-
-    // Sort: Newest first
-    filtered.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-    filtered.forEach(book => {
-        const card = document.createElement('article');
-        card.className = 'book-card';
-        card.onclick = (e) => handleBookClick(e, book);
-
-        const isFav = (JSON.parse(localStorage.getItem('favs') || '[]')).includes(book.id);
+    filterCategory: (cat, btn) => {
+        app.state.currentFilter = cat;
+        app.state.currentSubFilter = 'all'; // reset sub
         
-        card.innerHTML = `
-            <img src="${book.coverThumb || 'assets/img/placeholder.jpg'}" class="card-cover" loading="lazy">
-            <div class="card-content">
-                <div class="card-title">${book.title}</div>
-                <div class="card-author">${book.author}</div>
-                <div class="card-badges">
-                    <span class="badge">${book.category}</span>
-                    ${book.volumes.length > 1 ? `<span class="badge">${book.volumes.length} بەرگ</span>` : ''}
-                    ${isFav ? '<span class="badge">❤️</span>' : ''}
+        // UI Active State
+        document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+
+        // Show/Hide Sub filters
+        const subNav = document.getElementById('islamicFilters');
+        if (cat === 'ئیسـلامی') subNav.classList.remove('hidden');
+        else subNav.classList.add('hidden');
+
+        app.renderBooks();
+    },
+
+    filterSub: (sub) => {
+        app.state.currentSubFilter = sub;
+        document.querySelectorAll('.chip-sm').forEach(c => c.classList.remove('active'));
+        event.target.classList.add('active');
+        app.renderBooks();
+    },
+
+    handleSearch: () => {
+        app.renderBooks();
+    },
+
+    // --- Book Details ---
+    openBook: (id) => {
+        const book = app.state.books.find(b => b.id === id);
+        if (!book) return;
+
+        const container = document.getElementById('bookDetailContent');
+        
+        let volumesHtml = '';
+        book.volumes.forEach((vol, idx) => {
+            volumesHtml += `
+                <div class="volume-item">
+                    <span>📚 ${vol.label}</span>
+                    <button class="volume-btn" onclick="app.downloadVolume('${vol.fileKey}', '${vol.label}')">کردنەوە / داگرتن</button>
+                </div>
+            `;
+        });
+
+        container.innerHTML = `
+            <div class="detail-header">
+                <img src="${book.cover.imageData}" class="detail-cover">
+                <div class="detail-meta">
+                    <h2>${book.title}</h2>
+                    <h4>نووسەر: ${book.author}</h4>
+                    <span class="card-badge">${book.category} ${book.islamic_section ? ' / ' + book.islamic_section : ''}</span>
+                    <div class="detail-desc">${book.description || 'هیچ زانیارییەک بەردەست نییە.'}</div>
                 </div>
             </div>
+            <div class="volume-list">
+                <h3>بەشەکانی کتێب (${book.volumes.length})</h3>
+                ${volumesHtml}
+            </div>
         `;
-        els.grid.appendChild(card);
-    });
-}
+        
+        app.navigate('details');
+    },
 
-// --- Interactions ---
-function handleBookClick(e, book) {
-    // Check if clicked volume or just card
-    if (book.volumes.length === 1) {
-        window.open(book.volumes[0].file, '_blank');
-        addToHistory(book.id);
-    } else {
-        openVolumeModal(book);
-    }
-}
-
-function openVolumeModal(book) {
-    document.getElementById('vmTitle').innerText = book.title;
-    const list = document.getElementById('vmList');
-    list.innerHTML = '';
-    
-    book.volumes.forEach(vol => {
-        const btn = document.createElement('button');
-        btn.className = 'btn-primary';
-        btn.innerText = vol.label;
-        btn.onclick = () => {
-            window.open(vol.file, '_blank');
-            addToHistory(book.id);
-            closeModal('volumeModal');
-        };
-        list.appendChild(btn);
-    });
-    
-    // Add Fav Toggle in Modal
-    const favBtn = document.createElement('button');
-    const isFav = (JSON.parse(localStorage.getItem('favs') || '[]')).includes(book.id);
-    favBtn.className = isFav ? 'btn-danger full-width' : 'btn-secondary full-width';
-    favBtn.innerText = isFav ? 'لابردن لە دڵخوازەکان 💔' : 'زیادکردن بۆ دڵخوازەکان ❤️';
-    favBtn.style.gridColumn = "span 2";
-    favBtn.onclick = () => toggleFav(book.id);
-    
-    list.appendChild(favBtn);
-    
-    els.volumeModal.classList.add('open');
-}
-
-function toggleFav(id) {
-    let favs = JSON.parse(localStorage.getItem('favs') || '[]');
-    if (favs.includes(id)) {
-        favs = favs.filter(f => f !== id);
-    } else {
-        favs.push(id);
-    }
-    localStorage.setItem('favs', JSON.stringify(favs));
-    closeModal('volumeModal');
-    renderBooks(); // Re-render to show heart
-}
-
-function addToHistory(id) {
-    // Optional: Implement recent list logic
-}
-
-function setupEventListeners() {
-    // Theme
-    els.themeToggle.onclick = () => {
-        state.theme = state.theme === 'light' ? 'dark' : 'light';
-        applyTheme();
-    };
-
-    // Filter Chips
-    els.chips.forEach(chip => {
-        chip.onclick = () => {
-            els.chips.forEach(c => c.classList.remove('active'));
-            chip.classList.add('active');
-            state.filter.category = chip.dataset.cat;
-            
-            // Show Sub-cat if Islamic
-            if (state.filter.category === 'Islamic') els.subSection.classList.remove('hidden');
-            else els.subSection.classList.add('hidden');
-            
-            state.filter.sub = 'all'; // reset sub
-            document.querySelectorAll('.sub-chip').forEach(c => c.classList.remove('active'));
-            renderBooks();
-        };
-    });
-
-    els.subChips.forEach(chip => {
-        chip.onclick = () => {
-            els.subChips.forEach(c => c.classList.remove('active'));
-            chip.classList.add('active');
-            state.filter.sub = chip.dataset.sub;
-            renderBooks();
-        }
-    });
-
-    // Search
-    els.searchBtn.onclick = () => {
-        state.filter.search = els.search.value;
-        renderBooks();
-    };
-    els.search.onkeyup = (e) => {
-        if(e.key === 'Enter') els.searchBtn.click();
-    };
-
-    // Admin Access
-    els.adminBtn.onclick = () => {
-        if (state.isAdmin) showAdminPanel();
-        else els.loginModal.classList.add('open');
-    };
-
-    document.getElementById('loginConfirm').onclick = () => {
-        const pass = document.getElementById('adminPass').value;
-        if (pass === '1234') {
-            state.isAdmin = true;
-            closeModal('loginModal');
-            showAdminPanel();
-        } else {
-            alert('کۆدی هەڵە!');
-        }
-    };
-
-    // Admin Tab Switching
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.onclick = () => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            document.querySelectorAll('.admin-section').forEach(s => s.classList.add('hidden'));
-            document.getElementById('tab' + (btn.dataset.tab.charAt(0).toUpperCase() + btn.dataset.tab.slice(1))).classList.remove('hidden');
-        };
-    });
-
-    // Add Volume Row
-    document.getElementById('addVolumeBtn').onclick = () => addVolumeRow();
-
-    // Auto Cover Gen
-    els.coverInput.onchange = async (e) => {
-        const file = e.target.files[0];
-        if(!file) return;
+    downloadVolume: async (key, label) => {
         try {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-            const page = await pdf.getPage(1);
-            const scale = 1.0;
-            const viewport = page.getViewport({scale});
+            const fileBlob = await db.getFile(key);
+            if (!fileBlob) {
+                app.toast('فایلەکە نەدۆزرایەوە!');
+                return;
+            }
+            const url = URL.createObjectURL(fileBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${label}.pdf`; // Name for download
+            document.body.appendChild(a);
+            a.click();
             
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
-            
-            await page.render({canvasContext: context, viewport: viewport}).promise;
-            const base64 = canvas.toDataURL('image/jpeg', 0.8);
-            
-            els.coverPreview.src = base64;
-            els.coverBase64.value = base64;
-        } catch(err) {
-            alert('کێشە لە درووستکردنی کەڤەر: ' + err.message);
+            // Open in new tab for iPhone viewing
+            setTimeout(() => {
+                window.open(url, '_blank');
+                document.body.removeChild(a);
+            }, 100);
+        } catch (e) {
+            console.error(e);
+            app.toast('کێشەیەک هەیە لە کردنەوەی فایل');
         }
-    };
+    },
 
-    // Submit Book
-    els.bookForm.onsubmit = (e) => {
-        e.preventDefault();
-        saveBook();
-    };
+    // --- Admin: Add Book ---
+    handleFileSelect: async (input) => {
+        const files = Array.from(input.files);
+        if (files.length === 0) return;
 
-    // JSON Download
-    document.getElementById('downloadJsonBtn').onclick = () => {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({books: state.books}, null, 2));
-        const anchor = document.createElement('a');
-        anchor.setAttribute("href", dataStr);
-        anchor.setAttribute("download", "books.json");
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-    };
+        app.state.selectedFiles = files;
+        
+        // 1. Generate Cover from first file
+        document.getElementById('coverPreview').innerHTML = '<span class="placeholder">جارێ...</span>';
+        const coverData = await generateCoverFromPDF(files[0]);
+        app.state.generatedCover = coverData;
+        
+        if (coverData) {
+            document.getElementById('coverPreview').innerHTML = `<img src="${coverData}">`;
+        }
 
-    document.getElementById('exitAdminBtn').onclick = () => {
-        els.adminView.classList.add('hidden');
-        els.publicView.classList.remove('hidden');
-        renderBooks();
-    };
-    
-    // Category change in Admin
-    document.getElementById('inpCategory').onchange = (e) => {
-        const sub = document.getElementById('groupSubCat');
-        if(e.target.value === 'Islamic') sub.classList.remove('hidden');
-        else sub.classList.add('hidden');
-    };
-}
+        // 2. List volumes with editable names
+        const listContainer = document.getElementById('filePreviewList');
+        listContainer.innerHTML = '';
+        files.forEach((f, i) => {
+            const div = document.createElement('div');
+            div.className = 'file-list-item';
+            div.innerHTML = `
+                <span>📄</span>
+                <input type="text" id="vol_name_${i}" value="بەرگی ${i + 1}">
+                <small>(${Math.round(f.size/1024/1024*10)/10} MB)</small>
+            `;
+            listContainer.appendChild(div);
+        });
+    },
 
-// --- Admin Logic ---
-function showAdminPanel() {
-    els.publicView.classList.add('hidden');
-    els.adminView.classList.remove('hidden');
-    renderAdminList();
-    addVolumeRow(true); // init one row
-}
+    toggleIslamicSub: (val) => {
+        const grp = document.getElementById('newIslamicSubGroup');
+        if (val === 'ئیسـلامی') grp.classList.remove('hidden');
+        else grp.classList.add('hidden');
+    },
 
-function renderAdminList() {
-    const tbody = document.getElementById('adminBookList');
-    tbody.innerHTML = '';
-    state.books.forEach((book, index) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td><img src="${book.coverThumb}" class="admin-thumb"></td>
-            <td>${book.title}</td>
-            <td>${book.category}</td>
-            <td>
-                <button class="btn-danger small" onclick="deleteBook(${index})">سڕینەوە</button>
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
-}
+    saveNewBook: async () => {
+        const btn = document.getElementById('saveBtn');
+        btn.innerText = 'تکایە چاوەڕێبە...';
+        btn.disabled = true;
 
-function addVolumeRow(isFirst = false) {
-    const div = document.createElement('div');
-    div.className = 'volume-row';
-    div.innerHTML = `
-        <input type="text" placeholder="ناوی بەرگ (بەرگی ١)" class="vol-label" value="${isFirst ? 'بەرگی یەک' : ''}">
-        <input type="text" placeholder="ناوی فایل (books/file.pdf)" class="vol-path">
-        ${!isFirst ? '<button type="button" class="btn-danger small" onclick="this.parentElement.remove()">X</button>' : ''}
-    `;
-    els.volumeList.appendChild(div);
-}
+        try {
+            const title = document.getElementById('newTitle').value;
+            const author = document.getElementById('newAuthor').value;
+            const cat = document.getElementById('newCategory').value;
+            const sub = cat === 'ئیسـلامی' ? document.getElementById('newIslamicSection').value : '';
+            const desc = document.getElementById('newDesc').value;
+            
+            if (!app.state.selectedFiles.length) {
+                alert('تکایە فایل هەڵبژێرە');
+                throw new Error('No files');
+            }
 
-function saveBook() {
-    // Gather Data
-    const title = document.getElementById('inpTitle').value;
-    const author = document.getElementById('inpAuthor').value;
-    const cat = document.getElementById('inpCategory').value;
-    const subCat = document.getElementById('inpSubCategory').value;
-    const cover = els.coverBase64.value;
-    
-    // Gather Volumes
-    const volumes = [];
-    document.querySelectorAll('.volume-row').forEach(row => {
-        const label = row.querySelector('.vol-label').value;
-        const path = row.querySelector('.vol-path').value;
-        if(path) volumes.push({label, file: path});
-    });
+            const bookId = 'bk_' + Date.now();
+            const volumes = [];
+            const fileObjects = [];
 
-    if(volumes.length === 0) {
-        alert('تکایە لانی کەم یەک فایلی PDF دیاری بکە (پات/Path بنووسە)');
-        return;
+            // Process each file
+            for (let i = 0; i < app.state.selectedFiles.length; i++) {
+                const file = app.state.selectedFiles[i];
+                const label = document.getElementById(`vol_name_${i}`).value || `File ${i+1}`;
+                const fileKey = `${bookId}_v${i+1}`;
+                
+                volumes.push({ label, fileKey });
+                fileObjects.push({ key: fileKey, blob: file });
+            }
+
+            const newBook = {
+                id: bookId,
+                title, author, category: cat, islamic_section: sub, description: desc,
+                createdAt: new Date().toISOString(),
+                volumes,
+                cover: { type: 'generated', imageData: app.state.generatedCover }
+            };
+
+            await db.addBook(newBook, fileObjects);
+            
+            app.toast('کتێب بە سەرکەوتوویی زیادکرا');
+            document.getElementById('addBookForm').reset();
+            document.getElementById('filePreviewList').innerHTML = '';
+            document.getElementById('coverPreview').innerHTML = '';
+            app.state.selectedFiles = [];
+            app.loadBooks(); // refresh memory
+            
+        } catch (e) {
+            console.error(e);
+            alert('کێشەیەک ڕوویدا!');
+        } finally {
+            btn.innerText = 'زیادکردن';
+            btn.disabled = false;
+        }
+    },
+
+    // --- Admin: List & Delete ---
+    renderAdminList: () => {
+        const list = document.getElementById('adminBookList');
+        list.innerHTML = '';
+        app.state.books.forEach(b => {
+            const div = document.createElement('div');
+            div.className = 'admin-book-item';
+            div.innerHTML = `
+                <div>
+                    <strong>${b.title}</strong>
+                    <br><small>${b.volumes.length} بەرگ</small>
+                </div>
+                <button class="btn-danger" onclick="app.deleteBook('${b.id}')">سڕینەوە</button>
+            `;
+            list.appendChild(div);
+        });
+    },
+
+    deleteBook: async (id) => {
+        if(confirm('دڵنیای لە سڕینەوەی ئەم کتێبە و هەموو فایلەکانی؟')) {
+            await db.deleteBook(id);
+            app.loadBooks();
+            app.renderAdminList();
+            app.toast('سڕایەوە');
+        }
+    },
+
+    exportData: () => {
+        const data = JSON.stringify(app.state.books, null, 2);
+        const blob = new Blob([data], {type: "application/json"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `books_backup_${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    },
+
+    toast: (msg) => {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.classList.remove('hidden');
+        setTimeout(() => t.classList.add('hidden'), 3000);
     }
+};
 
-    const newBook = {
-        id: Date.now().toString(),
-        title, author, category: cat, subCategory: subCat,
-        coverThumb: cover,
-        volumes: volumes,
-        createdAt: new Date().toISOString()
-    };
-
-    state.books.unshift(newBook);
-    alert('کتێب زیادکرا! لەبیرت نەچێت JSON دابەزێنیت.');
-    renderAdminList();
-    els.bookForm.reset();
-    els.volumeList.innerHTML = '';
-    addVolumeRow(true);
-    els.coverPreview.src = '';
-}
-
-function deleteBook(index) {
-    if(confirm('دڵنیایت لە سڕینەوە؟')) {
-        state.books.splice(index, 1);
-        renderAdminList();
-    }
-}
-
-// --- Utils ---
-function closeModal(id) {
-    document.getElementById(id).classList.remove('open');
-}
-
-function applyTheme() {
-    document.documentElement.setAttribute('data-theme', state.theme);
-    localStorage.setItem('theme', state.theme);
-}
+// Start
+document.addEventListener('DOMContentLoaded', app.init);
