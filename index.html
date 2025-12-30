@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ckb" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>کتێبخانەی کوردستان</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100;300;400;500;700;900&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="assets/css/style.css">
+
+    <!-- PDF.js for Auto Cover -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container nav-content">
+            <div class="logo">
+                <span class="icon-book">📚</span>
+                <h1>کتێبخانەی کوردستان</h1>
+            </div>
+            <div class="nav-controls">
+                <div class="search-bar">
+                    <input type="text" id="searchInput" placeholder="گەڕان بۆ کتێب، نووسەر...">
+                    <button id="searchBtn">🔍</button>
+                </div>
+                <button id="themeToggle" class="icon-btn" title="گۆڕینی ڕەنگ">🌙</button>
+                <button id="adminBtn" class="btn-primary">Admin</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content (Public View) -->
+    <main id="publicView" class="container">
+        
+        <!-- Hero Section -->
+        <header class="hero">
+            <div class="hero-text">
+                <h2>سەرچاوەی زانیاری و مەعریفە</h2>
+                <p>گەورەترین کتێبخانەی دیجیتاڵی کوردی؛ ئیسلامی، مێژوو، و زیاتر.</p>
+            </div>
+        </header>
+
+        <!-- Filters -->
+        <section class="filters-section">
+            <div class="filter-scroll">
+                <button class="filter-chip active" data-cat="all">هەمووی</button>
+                <button class="filter-chip" data-cat="Islamic">ئیسلامی</button>
+                <button class="filter-chip" data-cat="History">مێژوو</button>
+                <button class="filter-chip" data-cat="Psychology">دەروونناسی</button>
+                <button class="filter-chip" data-cat="Literature">ئەدەب</button>
+                <button class="filter-chip" data-cat="Favorites">دڵخوازەکان ❤️</button>
+            </div>
+            <!-- Sub Categories (Hidden by default) -->
+            <div id="subCategories" class="sub-filters hidden">
+                <button class="sub-chip" data-sub="all">هەموو بەشەکان</button>
+                <button class="sub-chip" data-sub="تەفسیر">تەفسیر</button>
+                <button class="sub-chip" data-sub="فقه">فقه</button>
+                <button class="sub-chip" data-sub="عەقیدە">عەقیدە</button>
+                <button class="sub-chip" data-sub="فەرموودە">فەرموودە</button>
+            </div>
+        </section>
+
+        <!-- Book Grid -->
+        <section id="booksGrid" class="books-grid">
+            <!-- Books will be injected here via JS -->
+            <div class="loading">تکایە چاوەڕێبە، کتێبەکان دەخوێندرێنەوە...</div>
+        </section>
+
+    </main>
+
+    <!-- Admin Panel (Hidden by default) -->
+    <main id="adminView" class="container hidden">
+        <header class="admin-header">
+            <h2>داشبۆردی بەڕێوەبردن</h2>
+            <div class="admin-actions">
+                <button id="downloadJsonBtn" class="btn-success">⬇ دابەزاندنی JSON</button>
+                <button id="exitAdminBtn" class="btn-danger">دەرچوون</button>
+            </div>
+        </header>
+
+        <div class="admin-tabs">
+            <button class="tab-btn active" data-tab="list">لیستی کتێبەکان</button>
+            <button class="tab-btn" data-tab="add">زیادکردنی کتێب</button>
+        </div>
+
+        <!-- Tab: List -->
+        <section id="tabList" class="admin-section">
+            <div class="table-responsive">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>وێنە</th>
+                            <th>ناونیشان</th>
+                            <th>بەش</th>
+                            <th>کردارەکان</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adminBookList">
+                        <!-- Rows injected via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Tab: Add/Edit -->
+        <section id="tabAdd" class="admin-section hidden">
+            <form id="bookForm" class="admin-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>ناونیشانی کتێب *</label>
+                        <input type="text" id="inpTitle" required>
+                    </div>
+                    <div class="form-group">
+                        <label>نووسەر *</label>
+                        <input type="text" id="inpAuthor" required>
+                    </div>
+                    <div class="form-group">
+                        <label>بەشی سەرەکی *</label>
+                        <select id="inpCategory" required>
+                            <option value="Islamic">ئیسلامی</option>
+                            <option value="History">مێژوو</option>
+                            <option value="Psychology">دەروونناسی</option>
+                            <option value="Politics">سیاسەت</option>
+                            <option value="Literature">ئەدەب</option>
+                            <option value="General">هەمەجۆر</option>
+                        </select>
+                    </div>
+                    <div class="form-group hidden" id="groupSubCat">
+                        <label>بەشی ئیسلامی</label>
+                        <select id="inpSubCategory">
+                            <option value="تەفسیر">تەفسیر</option>
+                            <option value="فقه">فقه</option>
+                            <option value="عەقیدە">عەقیدە</option>
+                            <option value="فەرموودە">فەرموودە</option>
+                            <option value="تاریخ">تاریخی ئیسلامی</option>
+                            <option value="General">هەمەجۆر</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>زمان</label>
+                        <select id="inpLanguage">
+                            <option value="کوردی">کوردی</option>
+                            <option value="عەرەبی">عەرەبی</option>
+                            <option value="فارسی">فارسی</option>
+                            <option value="ئینگلیزی">English</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>پوختە / Description</label>
+                    <textarea id="inpDesc" rows="3"></textarea>
+                </div>
+
+                <!-- Volume Manager -->
+                <div class="volumes-section">
+                    <h3>فایلەکان (PDF)</h3>
+                    <div id="volumeList" class="volume-list">
+                        <!-- Volume items here -->
+                    </div>
+                    <button type="button" id="addVolumeBtn" class="btn-secondary small">+ زیادکردنی بەرگ</button>
+                    
+                    <div class="auto-cover-box">
+                        <p>بۆ درووستکردنی کەڤەر، فایلێک هەڵبژێرە (تەنها بۆ درووستکردنی وێنە):</p>
+                        <input type="file" id="coverGeneratorInput" accept="application/pdf">
+                        <div class="preview-area">
+                            <img id="coverPreview" src="" alt="Cover Preview">
+                            <input type="hidden" id="inpCoverBase64">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary large">زیادکردنی کتێب</button>
+                    <button type="button" id="clearFormBtn" class="btn-danger">پاککردنەوە</button>
+                </div>
+            </form>
+        </section>
+    </main>
+
+    <!-- Modals -->
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <h3>چوونەژوورەوەی ئەدمین</h3>
+            <input type="password" id="adminPass" placeholder="کۆدی نهێنی (1234)">
+            <div class="modal-actions">
+                <button id="loginConfirm" class="btn-primary">چوونەژوورەوە</button>
+                <button onclick="closeModal('loginModal')" class="btn-secondary">داخستن</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Volume Select Modal (Public) -->
+    <div id="volumeModal" class="modal">
+        <div class="modal-content">
+            <h3 id="vmTitle">هەڵبژاردنی بەرگ</h3>
+            <div id="vmList" class="vm-grid"></div>
+            <button onclick="closeModal('volumeModal')" class="btn-secondary full-width">داخستن</button>
+        </div>
+    </div>
+
+    <script src="assets/js/app.js"></script>
+</body>
+</html>
